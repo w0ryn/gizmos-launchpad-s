@@ -15,7 +15,6 @@ GLOBAL_CURRENT_FLASH_ON = True
 
 GLOBAL_SLEEP_LOOP = 0.25
 
-ON_SIGNAL = [[0,0,127]]
 
 MAX_OUTPUT_VOLUME = 120
 MAX_OUTPUT_LEVEL = LAUNCHPAD_COLS - 1
@@ -27,11 +26,6 @@ MAX_INPUT_LEVEL = LAUNCHPAD_COLS - 1
 ################################################################
 ### Colors and Basic Messages ##################################
 ################################################################
-LIGHT_ON  = 0x90
-LIGHT_OFF = 0x80
-
-AUTOMAP_ON = 0xb0
-
 COLORS = {
     # Colors are combinations of red and green:
     # 0b00GG11RR
@@ -59,12 +53,52 @@ COLORS = {
 }
 
 RESET_LIGHT_SIGNAL = [0xb0, 0x00, 0x00]
-DEFAULT_COLOR = COLORS['LOW_RED']
+
+LIGHT_ON  = 0x90
+LIGHT_OFF = 0x80
+
+AUTOMAP_ON = 0xb0
+
+BUTTON_COLORS = {
+    '16': ['BRIGHT_ORANGE', 'MEDIUM_AMBER'],
+    '32': ['BRIGHT_ORANGE', 'MEDIUM_AMBER'],
+    '33': ['BRIGHT_ORANGE', 'MEDIUM_AMBER'],
+    '48': ['BRIGHT_ORANGE', 'MEDIUM_AMBER'],
+    'default': ['BRIGHT_RED', 'LOW_RED'],
+}
+
+def button_color(byte_signal=None, note=None, button_colors=None):
+    note = note if note is not None else byte_signal[0][1]
+
+    if button_colors is None:
+        button_colors = BUTTON_COLORS.get(str(note), BUTTON_COLORS['default'])
+
+    color = COLORS[
+        button_colors[0] if is_keydown(byte_signal) else button_colors[1]
+    ]
+
+    midiout.send_message([LIGHT_ON, note, color])
 
 AUTOMAP_COLORS = {
+    '104': ['BRIGHT_GREEN', 'MEDIUM_YELLOW'],
+    '105': ['BRIGHT_AMBER', 'MEDIUM_YELLOW'],
     '111': ['BRIGHT_RED', 'MEDIUM_ORANGE'],
     'default': [ 'YELLOW_GREEN', 'LOW_GREEN' ],
 }
+
+def automap_color(byte_signal, force_default=False):
+    note = byte_signal[0][1]
+
+    automap_colors = AUTOMAP_COLORS.get(
+        'default' if force_default else str(note),
+        AUTOMAP_COLORS['default']
+    )
+
+    color = COLORS[
+        automap_colors[0] if is_keydown(byte_signal) else automap_colors[1]
+    ]
+
+    midiout.send_message([AUTOMAP_ON, note, color])
 
 
 ################################################################
@@ -79,8 +113,40 @@ def fix_value_to_bounds(val, lower, upper):
 def restart_pulse_audio():
     call(['pulseaudio', '-k'])
 
+def num_lock(toggle=False):
+    if toggle:
+        call(['xdotool', 'key', 'Num_Lock'])
+
+    cmd = 'xset q | grep -q "Num Lock:\\s*on" && echo 1'
+    return bool(os.popen(cmd).read())
+
+def caps_lock(toggle=False):
+    if toggle:
+        call(['xdotool', 'key', 'Caps_Lock'])
+
+    cmd = 'xset q | grep -q "Caps Lock:\\s*on" && echo 1'
+    return bool(os.popen(cmd).read())
+
+def hold_key(byte_signal, key):
+    # pylint: disable=expression-not-assigned
+    keydown(key) if is_keydown(byte_signal) else keyup(key)
+    button_color(byte_signal)
+
+def keydown(key):
+    call(['xdotool', 'keydown', key])
+    return True
+
+def keyup(key):
+    call(['xdotool', 'keyup', key])
+    return False
+
+
 is_keydown = lambda byte_signal: byte_signal[0][2] == 127
 is_automap_key = lambda byte_signal: byte_signal[0][0] == 176
+
+midi_signal = lambda note=0, on=True: [[0,note,127 if on else 0]]
+
+
 
 ################################################################
 ### Keybindings and Keybound Actions ###########################
@@ -91,10 +157,17 @@ AUTOMAP = {} # automap row is handled differently from other rows
 HOLD_BINDINGS = {} # handles both keyup / keydown
 KEYBINDINGS = {} # only triggered on keydown
 
+HOLD_BINDINGS['16'] = lambda byte_signal: hold_key(byte_signal, 'Left')
+HOLD_BINDINGS['32'] = lambda byte_signal: hold_key(byte_signal, 'Down')
+HOLD_BINDINGS['33'] = lambda byte_signal: hold_key(byte_signal, 'Up')
+HOLD_BINDINGS['48'] = lambda byte_signal: hold_key(byte_signal, 'Right')
+
 def pulse_default_source_volume_control(level, set_volume=True):
     level = MAX_INPUT_LEVEL if level > MAX_INPUT_LEVEL else level
 
     INDICES = { 'main': [80, 88], 'staggered': [64, 71] }
+
+    DEFAULT_COLOR = 'LOW_RED'
 
     COLOR_BY_LEVEL = [
         'MEDIUM_RED', 'MEDIUM_RED',
@@ -121,8 +194,8 @@ def pulse_default_source_volume_control(level, set_volume=True):
 
         color = COLOR_BY_LEVEL[x] if level > 0 else NO_VOLUME_COLOR
 
-        messages.append([LIGHT_ON, main_index, COLORS[color]])
-        messages.append([LIGHT_ON, staggered_index, COLORS[color]])
+        button_color([[0, main_index, 127]], button_colors=[color, DEFAULT_COLOR])
+        button_color([[0, staggered_index, 127]], button_colors=[color, DEFAULT_COLOR])
 
     for x in range(MAX_INPUT_LEVEL - level):
         main_index = INDICES['main'][1] - x
@@ -132,8 +205,8 @@ def pulse_default_source_volume_control(level, set_volume=True):
             INDICES['staggered'][1],
         )
 
-        messages.append([LIGHT_ON, main_index, DEFAULT_COLOR])
-        messages.append([LIGHT_ON, staggered_index, DEFAULT_COLOR])
+        button_color([[0, main_index, 0]], button_colors=[None, DEFAULT_COLOR])
+        button_color([[0, staggered_index, 0]], button_colors=[None, DEFAULT_COLOR])
 
     for message in messages:
         midiout.send_message(message)
@@ -185,6 +258,7 @@ def system_default_output_volume_control(level, set_volume=True):
         'BRIGHT_RED', 'BRIGHT_RED',
     ]
 
+    DEFAULT_COLOR = 'LOW_RED'
     NO_VOLUME_COLOR = 'BRIGHT_RED'
 
     messages = []
@@ -203,8 +277,8 @@ def system_default_output_volume_control(level, set_volume=True):
 
         color = COLOR_BY_LEVEL[x] if level > 0 else NO_VOLUME_COLOR
 
-        messages.append([LIGHT_ON, main_index, COLORS[color]])
-        messages.append([LIGHT_ON, staggered_index, COLORS[color]])
+        button_color([[0, main_index, 127]], button_colors=[color, DEFAULT_COLOR])
+        button_color([[0, staggered_index, 127]], button_colors=[color, DEFAULT_COLOR])
 
     for x in range(MAX_OUTPUT_LEVEL - level):
         main_index = INDICES['main'][1] - x
@@ -214,8 +288,10 @@ def system_default_output_volume_control(level, set_volume=True):
             INDICES['staggered'][1],
         )
 
-        messages.append([LIGHT_ON, main_index, DEFAULT_COLOR])
-        messages.append([LIGHT_ON, staggered_index, DEFAULT_COLOR])
+        color = None
+        button_color([[0, main_index, 0]], button_colors=[color, DEFAULT_COLOR])
+        button_color([[0, staggered_index, 0]], button_colors=[color, DEFAULT_COLOR])
+
 
     for message in messages:
         midiout.send_message(message)
@@ -254,26 +330,32 @@ KEYBINDINGS['118'] = KEYBINDINGS['102']
 KEYBINDINGS['119'] = KEYBINDINGS['103']
 KEYBINDINGS['120'] = lambda byte_signal: system_default_output_toggle()
 
+def automap_104(byte_signal):
+    if is_keydown(byte_signal):
+        automap_color(
+            midi_signal(
+                note=byte_signal[0][1],
+                on=num_lock(toggle=True),
+            )
+        )
 
-def automap_color(byte_signal, force_default=False):
-    note = byte_signal[0][1]
+def automap_105(byte_signal):
+    if is_keydown(byte_signal):
+        automap_color(
+            midi_signal(
+                note=byte_signal[0][1],
+                on=caps_lock(toggle=True),
+            )
+        )
 
-    automap_colors = AUTOMAP_COLORS.get(
-        'default' if force_default else str(note),
-        AUTOMAP_COLORS['default']
-    )
-
-    color = COLORS[
-        automap_colors[0] if is_keydown(byte_signal) else automap_colors[1]
-    ]
-
-    midiout.send_message([AUTOMAP_ON, note, color])
 
 def automap_111(byte_signal):
     restart_pulse_audio()
     automap_color(byte_signal)
 
 AUTOMAP['default'] = automap_color
+AUTOMAP['104'] = automap_104
+AUTOMAP['105'] = automap_105
 AUTOMAP['111'] = automap_111
 
 ################################################################
@@ -286,6 +368,7 @@ def boot_sequence():
     pause_time = 0.5
 
     automap_signal = lambda x: [[AUTOMAP_ON, 104 + x, 0]]
+    button_signal = lambda x: [[LIGHT_ON, x, 0]]
 
     for x in range(LAUNCHPAD_COLS - 1):
         automap_color(automap_signal(x), force_default=True)
@@ -293,9 +376,8 @@ def boot_sequence():
         sleep_time *= multiplier
 
     for x in range(LAUNCHPAD_ROWS * LAUNCHPAD_COLS):
-        midiout.send_message(
-            [LIGHT_ON, floor(x/LAUNCHPAD_COLS)*16 + x%LAUNCHPAD_COLS, DEFAULT_COLOR]
-        )
+        index = floor(x/LAUNCHPAD_COLS)*16 + x%LAUNCHPAD_COLS
+        button_color(button_signal(index), button_colors=BUTTON_COLORS['default'])
         time.sleep(sleep_time)
         sleep_time *= multiplier
 
@@ -304,6 +386,9 @@ def boot_sequence():
     # load actual color settings
     for x in range(LAUNCHPAD_COLS - 1):
         automap_color(automap_signal(x))
+    for x in range(LAUNCHPAD_ROWS*LAUNCHPAD_COLS):
+        if not str(x) in KEYBINDINGS.keys():
+            button_color(button_signal(x))
 
 
 ################################################################
@@ -314,6 +399,7 @@ def update():
     update_global_flash_cycle()
     update_output_volume_visual()
     update_input_volume_visual()
+    update_key_lock_visual()
 
 def update_global_flash_cycle():
     # pylint: disable=global-statement
@@ -351,6 +437,16 @@ def update_input_volume_visual():
         pulse_default_source_volume_control(level, set_volume=False)
         pulse_default_source_toggle(toggle=False)
 
+def update_key_lock_visual():
+    update_num_lock_visual()
+    update_caps_lock_visual()
+
+def update_num_lock_visual():
+    automap_color(midi_signal(note=104, on=num_lock()))
+
+def update_caps_lock_visual():
+    automap_color(midi_signal(note=105, on=caps_lock()))
+
 
 ################################################################
 ### Application Loop ###########################################
@@ -361,7 +457,6 @@ def input_callback(midi_in, dump):
     if dump is not None:
         print(dump)
 
-    color = COLORS['BRIGHT_RED'] if is_keydown(midi_in) else DEFAULT_COLOR
     note = midi_in[0][1]
 
     is_automap = is_automap_key(midi_in)
@@ -381,8 +476,8 @@ def input_callback(midi_in, dump):
         AUTOMAP[key](midi_in)
 
     else:
+        button_color(midi_in)
         print(note)
-        midiout.send_message([LIGHT_ON, note, color])
 
 
 if __name__ == '__main__':
