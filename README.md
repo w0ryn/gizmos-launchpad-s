@@ -2,8 +2,9 @@
 
 # Launchpad System Controller
 Communicates with the Launchpad-S for a fun, visual system controller.
+Notice that I have rotated the device a quarter-turn counter clockwise.
 
-![MK 1](./images/mk-1.jpg)
+![MK 2](./images/mk-2.jpg)
 
 ### Current Functionality
 - Talk to PulseAudio to update default sink and source volumes / toggles.
