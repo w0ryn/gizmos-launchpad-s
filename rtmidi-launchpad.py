@@ -108,6 +108,11 @@ BUTTON_COLORS = {
 BUTTON_COLORS['automap'] = {
     '104': ['BRIGHT_GREEN', 'MEDIUM_YELLOW'],
     '105': ['BRIGHT_AMBER', 'MEDIUM_YELLOW'],
+
+    '107': ['BRIGHT_ORANGE', 'MEDIUM_AMBER'],
+    '108': ['BRIGHT_ORANGE', 'MEDIUM_YELLOW'],
+    '109': ['BRIGHT_ORANGE', 'MEDIUM_AMBER'],
+
     '111': ['BRIGHT_RED', 'MEDIUM_ORANGE'],
     'default': [ 'YELLOW_GREEN', 'DIM_GREEN' ],
 }
@@ -208,6 +213,15 @@ def bind_key(byte_signal, key):
     keydown(key) if is_keydown(byte_signal) else keyup(key)
     color_button(byte_signal)
 
+def youtube_play_pause():
+    os.system('youtube-media-controls playpause')
+
+def youtube_next_song():
+    os.system('youtube-media-controls next')
+
+def youtube_prev_song():
+    os.system('youtube-media-controls prev')
+
 keydown = lambda key: call(['xdotool', 'keydown', key])
 keyup = lambda key: call(['xdotool', 'keyup', key])
 
@@ -281,9 +295,27 @@ def restart_audio_engine(byte_signal):
     restart_pulse_audio()
     color_automap_button(byte_signal)
 
+def play_pause(byte_signal):
+    color_automap_button(byte_signal)
+    if is_keydown(byte_signal):
+        youtube_play_pause()
+
+def next_song(byte_signal):
+    color_automap_button(byte_signal)
+    if is_keydown(byte_signal):
+        youtube_next_song()
+
+def prev_song(byte_signal):
+    color_automap_button(byte_signal)
+    if is_keydown(byte_signal):
+        youtube_prev_song()
+
 AUTOMAP['default'] = color_automap_button
 AUTOMAP['104'] = toggle_num_lock
 AUTOMAP['105'] = toggle_caps_lock
+AUTOMAP['107'] = prev_song
+AUTOMAP['108'] = play_pause
+AUTOMAP['109'] = next_song
 AUTOMAP['111'] = restart_audio_engine
 
 
