@@ -18,6 +18,9 @@ GLOBAL_FLASH_TIME = 0.5
 GLOBAL_FLASH_CYCLE = GLOBAL_FLASH_TIME
 GLOBAL_FLASH_ON = True
 
+PORT_COUNT = 0
+GLOBAL_REFRESH_PORT_SIGNAL = False
+
 APPLICATION_REFRESH_TIME = 0.25
 
 MAX_OUTPUT_VOLUME = 140
@@ -524,6 +527,7 @@ def boot_sequence():
 ################################################################
 
 def update():
+    update_midi_port()
     update_global_flash_cycle()
     update_output_volume_visual()
     update_input_volume_visual()
@@ -575,6 +579,23 @@ def update_num_lock_visual():
 def update_caps_lock_visual():
     color_automap_button(generate_fake_midi_signal(note=105, on=caps_lock()))
 
+def update_midi_port():
+    # pylint: disable=global-statement
+    global GLOBAL_REFRESH_PORT_SIGNAL, PORT_COUNT
+
+    if midiout.get_port_count() < PORT_COUNT:
+        GLOBAL_REFRESH_PORT_SIGNAL = True
+    elif GLOBAL_REFRESH_PORT_SIGNAL:
+        GLOBAL_REFRESH_PORT_SIGNAL = False
+
+        midiout.close_port()
+        midiin.close_port()
+
+        time.sleep(1)
+
+        midiout.open_port(1)
+        midiin.open_port(1)
+        boot_sequence()
 
 ################################################################
 ### Application Loop ###########################################
@@ -623,6 +644,8 @@ if __name__ == '__main__':
 
     midiout.send_message(RESET_LIGHT_SIGNAL)
     boot_sequence()
+
+    PORT_COUNT = midiout.get_port_count()
 
 
     try:
