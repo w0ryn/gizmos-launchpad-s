@@ -495,7 +495,7 @@ KEYBINDINGS['120'] = lambda byte_signal: system_default_sink_toggle()
 ### Light Sequences ############################################
 ################################################################
 
-def boot_sequence():
+def boot_sequence(update_me=True):
     sleep_time = 0.03
     multiplier = .98
     pause_time = 0.5
@@ -520,7 +520,8 @@ def boot_sequence():
     for x in range(LAUNCHPAD_ROWS*LAUNCHPAD_COLS):
         color_button(button_signal(x))
 
-    update()
+    if update_me:
+        update()
 
 ################################################################
 ### Persistent Updates #########################################
@@ -588,14 +589,21 @@ def update_midi_port():
     elif GLOBAL_REFRESH_PORT_SIGNAL:
         GLOBAL_REFRESH_PORT_SIGNAL = False
 
-        midiout.close_port()
-        midiin.close_port()
+        activate_ports()
 
-        time.sleep(1)
+        boot_sequence(update_me=False)
 
-        midiout.open_port(1)
-        midiin.open_port(1)
-        boot_sequence()
+def activate_ports():
+    midiout.close_port()
+    midiin.close_port()
+
+    time.sleep(.5)
+
+    midiout.open_port(1)
+    midiin.open_port(1)
+
+    midiin.set_callback(input_callback)
+    midiout.send_message(RESET_LIGHT_SIGNAL)
 
 ################################################################
 ### Application Loop ###########################################
@@ -633,20 +641,12 @@ def input_callback(midi_in, dump):
 if __name__ == '__main__':
     # pylint: disable=no-member
     midiout = rtmidi.MidiOut()
-    available_out = midiout.get_ports()
-    midiout.open_port(1)
-
     midiin = rtmidi.MidiIn()
-    available_in = midiin.get_ports()
-    midiin.open_port(1)
 
-    midiin.set_callback(input_callback)
-
-    midiout.send_message(RESET_LIGHT_SIGNAL)
+    activate_ports()
     boot_sequence()
 
     PORT_COUNT = midiout.get_port_count()
-
 
     try:
         while True:
