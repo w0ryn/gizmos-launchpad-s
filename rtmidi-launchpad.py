@@ -584,23 +584,34 @@ def update_midi_port():
     # pylint: disable=global-statement
     global GLOBAL_REFRESH_PORT_SIGNAL, PORT_COUNT
 
-    if midiout.get_port_count() < PORT_COUNT:
-        GLOBAL_REFRESH_PORT_SIGNAL = True
-    elif GLOBAL_REFRESH_PORT_SIGNAL:
-        GLOBAL_REFRESH_PORT_SIGNAL = False
+    current_port_count = midiout.get_port_count()
 
+    if current_port_count < PORT_COUNT:
+        PORT_COUNT = midiout.get_port_count()
+
+    elif current_port_count > PORT_COUNT:
         activate_ports()
-
         boot_sequence(update_me=False)
 
 def activate_ports():
+    # pylint: disable=global-statement
+    global PORT_COUNT
+
+
     midiout.close_port()
     midiin.close_port()
 
-    time.sleep(.5)
+    time.sleep(2.0)
 
-    midiout.open_port(1)
-    midiin.open_port(1)
+    cmd = '''amidi --list-devices | grep Launchpad | sed 's/.*hw:\\([0-9]\\).*/\\1/';'''
+    cmd_output = os.popen(cmd).read()
+    print(cmd_output)
+    port_number = int(cmd_output) - 1
+
+    midiout.open_port(port_number)
+    midiin.open_port(port_number)
+
+    PORT_COUNT = midiout.get_port_count()
 
     midiin.set_callback(input_callback)
     midiout.send_message(RESET_LIGHT_SIGNAL)
@@ -645,8 +656,6 @@ if __name__ == '__main__':
 
     activate_ports()
     boot_sequence()
-
-    PORT_COUNT = midiout.get_port_count()
 
     try:
         while True:

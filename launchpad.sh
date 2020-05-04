@@ -51,4 +51,4 @@ command -v figlet >/dev/null 2>&1 && {
 
 echo -e "\e[3m(C-c to exit)\e[0m"
 
-python ./rtmidi-launchpad.py >/dev/null 2>&1;
+python $(dirname "$0")/rtmidi-launchpad.py >/dev/null 2>&1;
