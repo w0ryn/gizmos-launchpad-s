@@ -602,7 +602,7 @@ def activate_ports():
 
     time.sleep(2.0)
 
-    cmd = '''amidi --list-devices | grep Launchpad | sed 's/.*hw:\\([0-9]\\).*/\\1/';'''
+    cmd = '''amidi --list-devices | grep Launchpad -n | sed 's/:.*$//'; '''
     cmd_output = os.popen(cmd).read()
     port_number = int(cmd_output)
 
