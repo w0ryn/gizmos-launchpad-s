@@ -597,7 +597,6 @@ def activate_ports():
     # pylint: disable=global-statement
     global PORT_COUNT
 
-
     midiout.close_port()
     midiin.close_port()
 
@@ -605,8 +604,7 @@ def activate_ports():
 
     cmd = '''amidi --list-devices | grep Launchpad | sed 's/.*hw:\\([0-9]\\).*/\\1/';'''
     cmd_output = os.popen(cmd).read()
-    print(cmd_output)
-    port_number = int(cmd_output) - 1
+    port_number = int(cmd_output)
 
     midiout.open_port(port_number)
     midiin.open_port(port_number)
@@ -632,6 +630,9 @@ def input_callback(midi_in, dump):
     is_keybinding = not is_automap and str(note) in KEYBINDINGS.keys()
     is_holdbinding = not is_automap and str(note) in HOLD_BINDINGS.keys()
     is_automap_binding = is_automap and str(note) in AUTOMAP.keys()
+
+    print(byte_signal)
+    print('input callback')
 
     if is_keybinding:
         if is_keydown(byte_signal):
