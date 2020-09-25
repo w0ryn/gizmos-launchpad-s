@@ -594,7 +594,7 @@ def activate_ports():
 
     cmd = '''amidi --list-devices | grep Launchpad -n | sed 's/:.*$//'; '''
     cmd_output = os.popen(cmd).read()
-    port_number = int(cmd_output)
+    port_number = int(cmd_output) - 1 # @TODO : Figure out why the offset changes
 
     midiout.open_port(port_number)
     midiin.open_port(port_number)
